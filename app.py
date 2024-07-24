@@ -7,12 +7,18 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Dictionary to store room users
 room_users = {}
+# Dictionary to map socket ids to room and username
+socket_room_user_map = {}
 
 @socketio.on('join')
 def join(message):
     username = message['username']
     room = message['room']
     join_room(room)
+    session_id = request.sid  # Get socket session id
+
+    # Mapping socket session to room and username
+    socket_room_user_map[session_id] = {'room': room, 'username': username}
 
     # Adding user to the room list in the dictionary
     if room not in room_users:
@@ -41,6 +47,22 @@ def leave(message):
     emit('user_list', {'users': room_users[room]}, to=room)
 
     print('RoomEvent: {} has left the room {}\n'.format(username, room))
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    session_id = request.sid
+    if session_id in socket_room_user_map:
+        user_info = socket_room_user_map[session_id]
+        room = user_info['room']
+        username = user_info['username']
+        
+        # Handle as if the user sent a leave event
+        leave({'username': username, 'room': room})
+
+        # Clean up map after handling disconnection
+        del socket_room_user_map[session_id]
+
+        print('DisconnectEvent: {} has been disconnected from the room {}\n'.format(username, room))
 
 @socketio.on('data')
 def transfer_data(message):
