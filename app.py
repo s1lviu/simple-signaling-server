@@ -6,7 +6,7 @@ import logging
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback_secret_key')
-socketio = SocketIO(app, cors_allowed_origins=["*"])
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Thread-safe dictionaries
 room_users = {}
