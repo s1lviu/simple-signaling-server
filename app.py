@@ -14,50 +14,39 @@ socket_room_user_map = {}
 def join(message):
     username = message['username']
     room = message['room']
-    session_id = request.sid  # Get socket session id
     join_room(room)
-    
+    session_id = request.sid  # Get socket session id
+
     # Mapping socket session to room and username
     socket_room_user_map[session_id] = {'room': room, 'username': username}
-    
+
     # Adding user to the room list in the dictionary
     if room not in room_users:
         room_users[room] = []
     if username not in room_users[room]:
         room_users[room].append(username)
-    
+
     # Emit the list of users in the room to all users in the room
-    emit('user_list', {'users': [{'username': u, 'id': sid} for sid, info in socket_room_user_map.items() if info['room'] == room]}, to=room)
-    
-    # Emit a 'user_joined' event to all other users in the room
-    emit('user_joined', {'username': username, 'id': session_id}, to=room, skip_sid=session_id)
-    
+    emit('user_list', {'users': room_users[room]}, to=room)
+
     print(f'RoomEvent: {username} has joined the room {room}')
 
 @socketio.on('leave')
 def leave(message):
     username = message['username']
     room = message['room']
-    session_id = request.sid
     leave_room(room)
-    
+
     # Remove user from the room list
     if room in room_users and username in room_users[room]:
         room_users[room].remove(username)
         if not room_users[room]:  # remove the room if empty
             del room_users[room]
-    
-    # Remove user from socket_room_user_map
-    if session_id in socket_room_user_map:
-        del socket_room_user_map[session_id]
-    
+
     # Emit the updated list of users to remaining users
     if room in room_users:  # Check if room still exists
-        emit('user_list', {'users': [{'username': u, 'id': sid} for sid, info in socket_room_user_map.items() if info['room'] == room]}, to=room)
-    
-    # Emit a 'user_left' event to all other users in the room
-    emit('user_left', session_id, to=room)
-    
+        emit('user_list', {'users': room_users[room]}, to=room)
+
     print(f'RoomEvent: {username} has left the room {room}')
 
 @socketio.on('disconnect')
@@ -70,6 +59,10 @@ def handle_disconnect():
         
         # Handle as if the user sent a leave event
         leave({'username': username, 'room': room})
+
+        # Clean up map after handling disconnection
+        del socket_room_user_map[session_id]
+
         print(f'DisconnectEvent: {username} has been disconnected from the room {room}')
 
 @socketio.on('data')
